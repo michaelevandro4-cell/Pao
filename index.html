@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pão com Ovo - Chef Edition</title>
+  <style>
+    body {
+      background: #fffbe6;
+      font-family: sans-serif;
+      text-align: center;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid #333;
+      background: #fefae0;
+      touch-action: none;
+    }
+    #loja {
+      margin-top: 10px;
+    }
+    button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #joystick {
+      position: absolute;
+      bottom: 40px;
+      left: 40px;
+      width: 100px;
+      height: 100px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 50%;
+      touch-action: none;
+    }
+    #stick {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: #d4a373;
+      border-radius: 50%;
+      top: 30px;
+      left: 30px;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pão com Ovo 🍞🥚 - Chef Edition</h1>
+  <p>Setas ou joystick para mover | Espaço para cozinhar</p>
+  <canvas id="game" width="800" height="600"></canvas>
+
+  <div id="loja">
+    <h2>🛍️ Loja</h2>
+    <button onclick="comprar('velocidade')">+ Velocidade (10 pontos)</button>
+    <button onclick="comprar('tamanho')">+ Tamanho (15 pontos)</button>
+  </div>
+
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const player = { x: 400, y: 300, size: 40, speed: 3, score: 0, ovos: 0 };
+    const items = [];
+    const fogao = { x: 700, y: 500, size: 50 };
+    let chefao = null;
+    const chefaoImg = new Image();
+    chefaoImg.src = "https://i.imgur.com/1cXfK0U.png"; // chef pixelado
+
+    function spawnItem() {
+      const type = Math.random() < 0.5 ? "pão" : "ovo";
+      items.push({
+        x: Math.random() * (canvas.width - 40),
+        y: Math.random() * (canvas.height - 40),
+        type: type,
+        color: type === "pão" ? "#d4a373" : "#fff"
+      });
+    }
+
+    for (let i = 0; i < 6; i++) spawnItem();
+
+    const keys = {};
+    document.addEventListener("keydown", (e) => keys[e.key] = true);
+    document.addEventListener("keyup", (e) => keys[e.key] = false);
+
+    function comprar(tipo) {
+      if (tipo === "velocidade" && player.score >= 10) {
+        player.speed += 1;
+        player.score -= 10;
+      }
+      if (tipo === "tamanho" && player.score >= 15) {
+        player.size += 5;
+        player.score -= 15;
+      }
+    }
+
+    function update() {
+      let dx = 0, dy = 0;
+      if (keys["ArrowUp"]) dy -= player.speed;
+      if (keys["ArrowDown"]) dy += player.speed;
+      if (keys["ArrowLeft"]) dx -= player.speed;
+      if (keys["ArrowRight"]) dx += player.speed;
+
+      dx += joystick.dx;
+      dy += joystick.dy;
+
+      player.x += dx;
+      player.y += dy;
+
+      player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+      player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+      checkCollision();
+      checkFogao();
+      checkChefao();
+    }
+
+    function checkCollision() {
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        const dx = player.x + player.size / 2 - (item.x + 20);
+        const dy = player.y + player.size / 2 - (item.y + 20);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 30) {
+          items.splice(i, 1);
+          if (item.type === "ovo") player.ovos += 1;
+          player.score += 1;
+          spawnItem();
+        }
+      }
+    }
+
+    function checkFogao() {
+      const dx = player.x + player.size / 2 - (fogao.x + fogao.size / 2);
+      const dy = player.y + player.size / 2 - (fogao.y + fogao.size / 2);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 40 && keys[" "]) {
+        if (player.ovos > 0) {
+          player.score += player.ovos * 2;
+          player.ovos = 0;
+        }
+      }
+    }
+
+    function checkChefao() {
+      if (player.ovos >= 50 && !chefao) {
+        chefao = {
+          x: Math.random() * 700,
+          y: Math.random() * 500,
+          size: 60
+        };
+      }
+
+      if (chefao) {
+        const dx = player.x + player.size / 2 - (chefao.x + chefao.size / 2);
+        const dy = player.y + player.size / 2 - (chefao.y + chefao.size / 2);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 50) {
+          player.score = Math.max(0, player.score - 20);
+          player.ovos = 0;
+          chefao = null;
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      items.forEach(item => {
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(item.x + 15, item.y + 15, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#333";
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = "#b5651d";
+      ctx.fillRect(fogao.x, fogao.y, fogao.size, fogao.size);
+      ctx.fillStyle = "#000";
+      ctx.fillText("Fogão", fogao.x, fogao.y - 5);
+
+      ctx.fillStyle = "#ffb703";
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+      ctx.fillStyle = "#000";
+      ctx.fillText(`Pontos: ${player.score}`, 10, 20);
+      ctx.fillText(`Ovos: ${player.ovos}`, 10, 40);
+
+      if (chefao) {
+        ctx.drawImage(chefaoImg, chefao.x, chefao.y, chefao.size, chefao.size);
+        ctx.fillStyle = "#fff";
+        ctx.fillText("Chefão!", chefao.x, chefao.y - 5);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Joystick
+    const stick = document.getElementById("stick");
+    const joystick = { dx: 0, dy: 0 };
+    let dragging = false;
+
+    stick.addEventListener("touchstart", () => dragging = true);
+    stick.addEventListener("touchend", () => {
+      dragging = false;
+      stick.style.left = "30px";
+      stick.style.top = "30px";
+      joystick.dx = 0;
+      joystick.dy = 0;
+    });
+
+    stick.addEventListener("touchmove", (e) => {
+      if (!dragging) return;
+      const touch = e.touches[0];
+      const rect = document.getElementById("joystick").getBoundingClientRect();
+      const x = touch.clientX - rect.left - 20;
+      const y = touch.clientY - rect.top - 20;
+      const max = 40;
+      const dx = Math.max(-max, Math.min(max, x - 30));
+      const dy = Math.max(-max, Math.min(max, y - 30));
+      stick.style.left = `${30 + dx}px`;
+      stick.style.top = `${30 + dy}px`;
+      joystick.dx = dx / max * player.speed;
+      joystick.dy = dy / max * player.speed;
+    });
+
+    loop();
+  </script>
+</body>
+</html
